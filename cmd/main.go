@@ -16,5 +16,6 @@ func execute(host, port string) (err error) {
 	srv := server.NewServer(net.JoinHostPort(host, port))
 	srv.Register("/", srv.RouteHandler("Welcome to our web-site"))
 	srv.Register("/about", srv.RouteHandler("About Golang Academy"))
+	srv.Register("/payments", srv.RouteHandler("boolshit"))
 	return srv.Start()
 }

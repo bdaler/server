@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,12 +16,17 @@ const (
 	PORT = "9999"
 )
 
-type HandlerFunc func(conn net.Conn)
+type HandlerFunc func(req Request)
 
 type Server struct {
 	addr     string
 	mu       sync.RWMutex
 	handlers map[string]HandlerFunc
+}
+
+type Request struct {
+	Conn        net.Conn
+	QueryParams url.Values
 }
 
 func NewServer(add string) *Server {
@@ -49,19 +55,21 @@ func (s *Server) Start() error {
 			log.Println(err)
 			continue
 		}
-		go s.handle(conn)
+		go s.handle(&Request{
+			Conn: conn,
+		})
 	}
 }
 
-func (s *Server) handle(conn net.Conn) {
+func (s *Server) handle(req *Request) {
 	defer func() {
-		if closeErr := conn.Close(); closeErr != nil {
+		if closeErr := req.Conn.Close(); closeErr != nil {
 			log.Println(closeErr)
 		}
 	}()
 
 	buf := make([]byte, 4096)
-	n, err := conn.Read(buf)
+	n, err := req.Conn.Read(buf)
 	if err == io.EOF {
 		log.Printf("%s", buf[:n])
 	}
@@ -79,17 +87,53 @@ func (s *Server) handle(conn net.Conn) {
 		log.Print("partsErr: ", parts)
 	}
 
+	path, err := url.ParseRequestURI(parts[1])
+	if err != nil {
+		log.Print("url ParseRequestURI err: ", err)
+	}
+	req.QueryParams = path.Query()
+	log.Print("req in handler 95: ", req)
+
 	s.mu.RLock()
 	if handler, ok := s.handlers[parts[1]]; ok {
 		s.mu.RUnlock()
-		handler(conn)
+		handler(*req)
 	}
 	return
 }
 
-func (s *Server) RouteHandler(body string) func(conn net.Conn) {
-	return func(conn net.Conn) {
-		_, err := conn.Write([]byte(s.Response(body)))
+func (s *Server) RouteHandler(body string) func(req Request) {
+	return func(req Request) {
+		//buf := make([]byte, 4096)
+		//n, err := req.Conn.Read(buf)
+		//if err == io.EOF {
+		//	log.Printf("%s", buf[:n])
+		//}
+		//
+		//data := buf[:n]
+		//requestLineDelim := []byte{'\r', '\n'}
+		//requestLineEnd := bytes.Index(data, requestLineDelim)
+		//if requestLineEnd == -1 {
+		//	log.Print("requestLineEndErr: ", requestLineEnd)
+		//}
+		//
+		//requestLine := string(data[:requestLineEnd])
+		//parts := strings.Split(requestLine, " ")
+		//if len(parts) != 3 {
+		//	log.Print("partsErr: ", parts)
+		//}
+		//
+		//path, err := url.ParseRequestURI(parts[1])
+		//if err != nil {
+		//	log.Print("url ParseRequestURI err: ", err)
+		//	return
+		//}
+		//req.QueryParams = path.Query()
+		//log.Print(req.QueryParams["id"])
+		//
+		//var id = req.QueryParams["id"][0]
+		log.Print("req in routeHandler: ", req)
+		_, err := req.Conn.Write([]byte(s.Response(body)))
 		if err != nil {
 			log.Print(err)
 		}
