@@ -16,7 +16,7 @@ const (
 	PORT = "9999"
 )
 
-type HandlerFunc func(req Request)
+type HandlerFunc func(req *Request)
 
 type Server struct {
 	addr     string
@@ -97,13 +97,13 @@ func (s *Server) handle(req *Request) {
 	s.mu.RLock()
 	if handler, ok := s.handlers[parts[1]]; ok {
 		s.mu.RUnlock()
-		handler(*req)
+		handler(req)
 	}
 	return
 }
 
-func (s *Server) RouteHandler(body string) func(req Request) {
-	return func(req Request) {
+func (s *Server) RouteHandler(body string) func(req *Request) {
+	return func(req *Request) {
 		//buf := make([]byte, 4096)
 		//n, err := req.Conn.Read(buf)
 		//if err == io.EOF {
